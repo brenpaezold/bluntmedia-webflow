@@ -1,0 +1,26 @@
+body {
+  font-family: sans-serif;
+  height: 100vh;
+  display: grid;
+  place-content: center;
+}
+
+header {
+  overflow: hidden;
+  border: solid black;
+}
+
+h1 {
+  font-size: 7rem;
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  text-transform: uppercase;
+  margin: 0;
+  line-height: 0.9;
+  padding-top: 1em;
+  /* clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%); */
+}
+
+.char {
+  transform: translateY(100px);
+  transition: transform 0.5s;
+}

@@ -1,0 +1,86 @@
+h1,
+h2,
+.heading-style-h1 {
+  /* color: red !important;
+  font-family: "Courier New", Courier, monospace !important; */
+}
+
+.background-video {
+  /* width: 100%; */
+}
+
+/* .cta-card .card-content {
+  transition: all 0.2s;
+  transform-origin: 50%% 50%;
+}
+.cta-card .card-content:hover {
+  scale: 1.02 !important;
+} */
+
+@media screen and (max-width: 800px) {
+  /* .background-video {scale:1;} */
+}
+
+@media only screen and (max-width: 1440px) {
+}
+
+@media only screen and (max-width: 1920px) {
+  .background-video {
+    border-radius: 0;
+  }
+}
+
+/* latest work headline
+.content-wrapper h2 {
+  font-size: clamp(1.125rem, -0.5294rem + 4.4118vw, 3rem);
+} */
+
+@media screen and (max-width: 767px) {
+  /* Service image */
+  a.cta-card.card-1 div img {
+  }
+  .service-cta-list > .card-image.card-1 {
+    object-fit: cover;
+    position: absolute;
+  }
+}
+
+/* Banner image loop 
+
+.loop-container {animation: scrollImages 90s linear infinite;}
+@keyframes scrollImages {
+  from { transform: translateX(0); }
+  to { transform: translateX(-2844px); }
+}
+
+.m-loop-container {animation: m-scrollImages 30s linear infinite;}
+@keyframes m-scrollImages {
+  from { transform: translateX(0); }
+  to { transform: translateX(-1300px); }
+}
+
+@media screen and (max-width: 767px) {
+    .logo-container {animation: logoScroll 30s linear infinite;}
+    @keyframes logoScroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-850px); }
+    }
+  }
+*/
+
+/* 
+
+@media (min-width: 992px) and (max-width: 1320px) {
+  .navbar__wrapper {
+    padding: 0px 20px;
+    opacity: 0.5;
+  }
+  .navmenu__dropdown-left {
+    padding-left: 20px;
+  }
+}
+
+.w-slider .w-slider-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+} */
