@@ -1,7 +1,3 @@
-  document.querySelectorAll('.w-condition-invisible').forEach(el => {
-    el.remove();
-  });
-  
 // gsap.registerPlugin(ScrollTrigger);
 
 gsap.set(".project-card", { autoAlpha: 1 });
