@@ -1,0 +1,46 @@
+name: Minify Assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+
+jobs:
+  minify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install tools
+        run: npm install -g terser clean-css-cli
+
+      - name: Minify JS
+        run: |
+          mkdir -p dist/js
+          for file in src/js/*.js; do
+            [ -f "$file" ] || continue
+            terser "$file" --compress --mangle --output "dist/js/$(basename "$file" .js).min.js"
+          done
+
+      - name: Minify CSS
+        run: |
+          mkdir -p dist/css
+          for file in src/css/*.css; do
+            [ -f "$file" ] || continue
+            cleancss -o "dist/css/$(basename "$file" .css).min.css" "$file"
+          done
+
+      - name: Commit minified files
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add dist/
+          git diff --staged --quiet || git commit -m "Minify assets"
+          git push
