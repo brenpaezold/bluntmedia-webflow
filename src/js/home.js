@@ -20,7 +20,7 @@ mm.add("(min-width: 800px)", () => {
   heroVideo.fromTo(".background-video", { scale: 0.8 }, { scale: 1 });
 });
 
-gsap.from(".background-video", { delay: 01, y: 100, opacity: 0 });
+gsap.from(".background-video", { delay: 0.1, y: 100, opacity: 0 });
 
 // Accordion animations
 
