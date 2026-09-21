@@ -3,6 +3,46 @@
 gsap.set(".background-video", { autoAlpha: 1 });
 let mm = gsap.matchMedia();
 
+// Re-measure every ScrollTrigger once the page stops moving. ScrollTrigger
+// refreshes on `load` by default, but the webfont swap and the lazy images
+// below the fold both land after that, and each one shifts the sections that
+// the #offerings pins are measured against.
+const refreshScrollTriggers = debounce(() => ScrollTrigger.refresh(), 150);
+
+window.addEventListener("load", refreshScrollTriggers);
+
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(refreshScrollTriggers);
+}
+
+// The two things that actually move this page after the triggers are built.
+// Both fire as ordinary events, independent of whether the tab is rendering.
+//
+// Lazy images are the big one: the card artwork and the logo strip above it
+// carry no width/height attributes, so every image that decodes resizes its
+// container and shifts everything below it.
+document.querySelectorAll('img[loading="lazy"]').forEach((img) => {
+  if (img.complete) return;
+  img.addEventListener("load", refreshScrollTriggers, { once: true });
+  img.addEventListener("error", refreshScrollTriggers, { once: true });
+});
+
+// Catch-all for anything the two hooks above miss (Webflow interactions,
+// content injected later). ResizeObserver only delivers while the page is
+// rendering, so it supplements the explicit hooks rather than replacing them.
+if (typeof ResizeObserver !== "undefined") {
+  let lastHeight = document.documentElement.scrollHeight;
+
+  new ResizeObserver(() => {
+    const height = document.documentElement.scrollHeight;
+    // Ignore no-op callbacks, including any caused by our own refresh; the
+    // height settles after one cycle so this cannot loop.
+    if (Math.abs(height - lastHeight) < 2) return;
+    lastHeight = height;
+    refreshScrollTriggers();
+  }).observe(document.body);
+}
+
 // Home Header Animation
 
 mm.add("(min-width: 800px)", () => {
@@ -55,6 +95,10 @@ document.addEventListener("DOMContentLoaded", () => {
     );
     toggle.setAttribute("aria-expanded", "true");
     activeAccordion = content; // Set the currently open accordion
+
+    // Opening/closing a panel changes the page height above #offerings, which
+    // moves the pinned cards. Re-measure once the 0.2s height tween has run.
+    gsap.delayedCall(0.25, refreshScrollTriggers);
   }
 
   // Automatically open the first accordion when #services is in view
@@ -85,51 +129,80 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Vertical stacking scroll with scale-down effect
+//
+// Each card pins so it sticks just under the previous one. Two things used to
+// break that, and both showed up as "the card sails past its stick point, then
+// snaps into place once the next one arrives":
+//
+//   1. ScrollTrigger measures start/end ONCE, when the trigger is created. This
+//      file runs at the end of <body>, before webfonts swap and before the lazy
+//      images above #offerings decode, so on a cold load every measurement is
+//      taken against a layout that is still moving. Nothing refreshed them
+//      afterwards, so the pins stayed bound to positions that no longer existed
+//      -- measured at ~1300px of drift on a 1680px viewport.
+//
+//      It hid on warm loads (everything cached, layout already final) and below
+//      1140px, where a style embed gives the cards a fixed 780px height so the
+//      page stops being content-sized. Hence "usually at wider breakpoints".
+//
+//   2. Toggling an accordion in #services changes the page height ABOVE the
+//      cards, which moves them again at runtime. Same stale-measurement result.
+//
+// The cure for both is to re-measure after anything that moves the page, so
+// refreshScrollTriggers() below is called from the accordion and from the
+// load/font/lazy-image settle points.
 
-const cards = gsap.utils.toArray(".helping-cta-card");
+const CARD_SELECTOR = ".helping-cta-card";
 const pinStartBase = 15;
 const pinStartStep = 2.5;
 
-gsap.set(cards, {
-  position: "relative",
-  transformOrigin: "top center",
-});
+// The cards unpin against whatever section follows #offerings. The old code
+// used "section:last-of-type", which is scoped per-parent rather than to the
+// document -- it happened to resolve to the CTA section, but would silently
+// pick a different element if the page structure ever changed.
+function offeringsEndTrigger() {
+  const offerings = document.querySelector("#offerings");
+  return (
+    (offerings && offerings.nextElementSibling &&
+      offerings.nextElementSibling.closest("section")) ||
+    document.querySelector("section.section_cta") ||
+    "#offerings"
+  );
+}
 
-// Only activate ScrollTriggers above 600px
-function initCardScroll() {
-  // Kill any existing ones first (safety)
-  ScrollTrigger.getAll().forEach((t) => {
-    if (cards.includes(t.trigger)) t.kill();
-  });
+// gsap.matchMedia() replaces the old resize listener + manual kill loop: it
+// builds the triggers when the query matches, and on the way out reverts the
+// pin markup and inline styles and refreshes, which the hand-rolled version
+// did not do reliably.
+mm.add("(min-width: 601px)", () => {
+  const cards = gsap.utils.toArray(CARD_SELECTOR);
+  if (!cards.length) return;
 
-  // Skip ScrollTriggers entirely on mobile
-  if (window.innerWidth <= 600) return;
+  gsap.set(cards, { position: "relative", transformOrigin: "top center" });
 
-  // Otherwise, create them
+  const endTrigger = offeringsEndTrigger();
+
   cards.forEach((card, index) => {
-    const startOffset = `${pinStartBase + index * pinStartStep}%`;
-    const targetScale = 0.9 + index * 0.05;
-
     gsap.set(card, { zIndex: index + 1, scale: 1 });
 
     ScrollTrigger.create({
       trigger: card,
-      start: `top ${startOffset}`,
-      endTrigger: "section:last-of-type",
+      start: `top ${pinStartBase + index * pinStartStep}%`,
+      endTrigger,
       end: "top bottom",
       pin: true,
       pinSpacing: false,
-      animation: gsap.to(card, { scale: targetScale, ease: "none" }),
       scrub: 1,
+      // Recompute the start/end and the tween on every refresh rather than
+      // reusing the values captured at creation time.
+      invalidateOnRefresh: true,
+      animation: gsap.to(card, { scale: 0.9 + index * 0.05, ease: "none" }),
     });
   });
-}
 
-// Run on load
-initCardScroll();
+  return () => gsap.set(cards, { clearProps: "zIndex,scale,position,transformOrigin" });
+});
 
-// Optional: re-init on resize (debounced)
-// window.addEventListener("resize", gsap.utils.debounce(initCardScroll, 300));
 function debounce(fn, delay) {
   let timeoutId;
   return function (...args) {
@@ -138,7 +211,10 @@ function debounce(fn, delay) {
   };
 }
 
-window.addEventListener("resize", debounce(initCardScroll, 300));
+// (The old `resize` -> initCardScroll listener lived here. gsap.matchMedia()
+// now owns building and tearing down the card triggers across breakpoints, and
+// ScrollTrigger re-measures on resize by default, so it was both redundant and
+// -- once initCardScroll was removed -- a ReferenceError on every resize.)
 
 // // Horizontal scroll when in view
 
