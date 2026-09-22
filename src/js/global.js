@@ -2,28 +2,50 @@
 // gsap.registerPlugin(ScrollTrigger);
 
 //HEADER NAVIGATION
+// Hide the header on scroll down, show it on scroll up.
+//
+// The previous version fired a fresh gsap.to() on EVERY scroll update, with no
+// record of which state the header was already in. Ten scroll steps produced
+// nine overlapping 0.4s tweens fighting over the same property, which is what
+// made the header stutter; scrolling up could even leave it stuck half-hidden.
+// It also started lastScroll at 0 rather than the real scroll position, so
+// landing on a page the browser had restored mid-scroll counted as "scrolling
+// down" and whipped the header away the instant you touched the wheel.
 const navHeader = document.querySelector(".navbar");
 
-let lastScrollY = 0;
+if (navHeader) {
+  // Seed from the actual position: a restored scroll must not read as movement.
+  let lastScroll = window.scrollY;
+  let hidden = false;
 
-ScrollTrigger.create({
-  start: 0, // start tracking from top
-  onUpdate: (self) => {
-    let currentScroll = self.scroll();
-    if (currentScroll > lastScrollY) {
-      // scrolling down -> hide header
-      gsap.to(navHeader, { y: "-100%", duration: 0.4, ease: "power2.out" });
-    } else {
-      // scrolling up -> show header
-      gsap.to(navHeader, {
-        y: "0%",
-        duration: 0.4,
-        ease: "power2.out",
-      });
-    }
-    lastScrollY = currentScroll;
-  },
-});
+  // Ignore sub-pixel drift and trackpad inertia, which would otherwise flip
+  // direction repeatedly and restart the tween each time.
+  const THRESHOLD = 8;
+  // Near the top the header is always shown, so it can never be stranded
+  // off-screen at the point where there is nothing to scroll back up to.
+  const ALWAYS_SHOW_ABOVE = 120;
+
+  // Toggling a class, not tweening transform: IX2 owns the element's inline
+  // transform on every page and re-applies it, so a GSAP tween on `y` never
+  // took effect. The .nav-hidden rule in global.css is !important, which
+  // outranks the inline style.
+  const setHidden = (next) => {
+    if (next === hidden) return; // only act on an actual state change
+    hidden = next;
+    navHeader.classList.toggle("nav-hidden", next);
+  };
+
+  ScrollTrigger.create({
+    start: 0,
+    onUpdate: (self) => {
+      const current = self.scroll();
+      const delta = current - lastScroll;
+      if (Math.abs(delta) < THRESHOLD) return; // below the noise floor
+      lastScroll = current;
+      setHidden(current > ALWAYS_SHOW_ABOVE && delta > 0);
+    },
+  });
+}
 
 //SPLIT TEXT BANNER HEADERS
 
@@ -39,51 +61,61 @@ const ctaTitle = document.querySelector("#cta-title");
 const ctaPara = document.querySelector("#cta-para");
 const ctaButton = document.querySelector("#form_button");
 
+// Not every page has a banner: terms, privacy, thanks and 404 have none of these
+// elements. gsap.from(null) throws "Cannot read properties of null (reading
+// '_gsap')", which aborted the rest of the header animation and logged 3-4
+// errors per page load, so each step is now added only when its target exists.
 window.addEventListener("load", () => {
-  // Make sure SplitText is initialized *after* everything is loaded
-  const split = new SplitText(headerTitle, { type: "lines" });
+  const targets = [
+    headerTitle,
+    headerContent,
+    diffTitle,
+    headerImage,
+    projectContent,
+  ].filter(Boolean);
+  if (!targets.length) return;
 
-  // Set initial visibility
-  gsap.set(
-    [headerTitle, headerContent, diffTitle, headerImage, projectContent],
-    {
-      autoAlpha: 1,
-    }
-  );
+  gsap.set(targets, { autoAlpha: 1 });
 
-  // Create timeline
+  // SplitText is initialized *after* everything is loaded, so line breaks are final
+  const split = headerTitle ? new SplitText(headerTitle, { type: "lines" }) : null;
+
   const tl = gsap.timeline({
     defaults: { opacity: 0, duration: 0.3, ease: "power4.out" },
-    onComplete: () => split.revert(),
+    onComplete: () => split && split.revert(),
   });
 
-  tl.from(split.lines, {
-    skewX: 10,
-    skewY: -2,
-    y: 40,
-    opacity: 0,
-    stagger: 0.1,
-  })
-    .from(headerContent, { y: 20, opacity: 0 }, ">")
-    .from(headerImage, { y: 30, duration: 0.2 })
-    .from(diffTitle, { y: 30, duration: 0.2 })
-    .from(projectContent, { y: 30, duration: 0.2 }, "-=0.8");
+  if (split) {
+    tl.from(split.lines, {
+      skewX: 10,
+      skewY: -2,
+      y: 40,
+      opacity: 0,
+      stagger: 0.1,
+    });
+  }
+  if (headerContent) tl.from(headerContent, { y: 20, opacity: 0 }, ">");
+  if (headerImage) tl.from(headerImage, { y: 30, duration: 0.2 });
+  if (diffTitle) tl.from(diffTitle, { y: 30, duration: 0.2 });
+  if (projectContent) tl.from(projectContent, { y: 30, duration: 0.2 }, "-=0.8");
 });
 
-const tl2 = gsap.timeline({
-  defaults: { duration: 0.3, ease: "power4.out", opacity: 0 },
-  scrollTrigger: {
-    trigger: ".section_cta",
-    start: "bottom bottom",
-    // markers: true,
-    toggleActions: "play none none reverse",
-  },
-});
+// Same guard for the CTA block, which is absent on the utility pages.
+if (document.querySelector(".section_cta") && (ctaTitle || ctaButton)) {
+  const tl2 = gsap.timeline({
+    defaults: { duration: 0.3, ease: "power4.out", opacity: 0 },
+    scrollTrigger: {
+      trigger: ".section_cta",
+      start: "bottom bottom",
+      // markers: true,
+      toggleActions: "play none none reverse",
+    },
+  });
 
-tl2
-  .from(ctaTitle, { y: 100 })
-  // .from(ctaPara, { y: 100 }, "-=0.2")
-  .from(ctaButton, { y: 100 }, "-=0.2");
+  if (ctaTitle) tl2.from(ctaTitle, { y: 100 });
+  // if (ctaPara) tl2.from(ctaPara, { y: 100 }, "-=0.2");
+  if (ctaButton) tl2.from(ctaButton, { y: 100 }, "-=0.2");
+}
 
 // Footer Animation
 (function () {

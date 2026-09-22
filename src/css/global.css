@@ -286,3 +286,25 @@ a.link-nav.w--current:after {
     background-image: none;
   }
 }
+
+/* --- Header hide-on-scroll -------------------------------------------------
+   Driven by a class rather than a GSAP tween on `transform`.
+
+   Webflow's IX2 writes an inline `transform: translate3d(...)` onto .navbar and
+   keeps re-applying it, so gsap.to(navHeader, {y}) was silently losing the
+   fight -- measurable as the transform never leaving matrix(1,0,0,1,0,0) even
+   for a direct tween. A stylesheet rule marked !important outranks a
+   non-important inline style, so this wins where the tween could not, and it
+   leaves IX2's own interactions untouched. */
+.navbar {
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+}
+
+.navbar.nav-hidden {
+  transform: translateY(-100%) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar { transition: none; }
+}
